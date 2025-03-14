@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .board {
+            display: grid;
+            gap: 2px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #000;
+            background-color: #ccc;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .revealed {
+            background-color: #eee;
+            cursor: default;
+        }
+        .mine {
+            background-color: red;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Minesweeper</h1>
+    <div id="board" class="board"></div>
+    <button id="restart">Restart Game</button>
+
+    <script>
+        class Minesweeper {
+            constructor(rows, cols, mines) {
+                this.rows = rows;
+                this.cols = cols;
+                this.mines = mines;
+                this.board = [];
+                this.revealed = [];
+                this.init();
+            }
+
+            init() {
+                this.board = Array.from({ length: this.rows }, () => Array(this.cols).fill(""));
+                this.revealed = Array.from({ length: this.rows }, () => Array(this.cols).fill(false));
+                this.placeMines();
+                this.calculateNumbers();
+                this.renderBoard();
+            }
+
+            placeMines() {
+                let placedMines = 0;
+                while (placedMines < this.mines) {
+                    const row = Math.floor(Math.random() * this.rows);
+                    const col = Math.floor(Math.random() * this.cols);
+                    if (this.board[row][col] !== "M") {
+                        this.board[row][col] = "M";
+                        placedMines++;
+                    }
+                }
+            }
+
+            calculateNumbers() {
+                const directions = [-1, 0, 1];
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (this.board[r][c] === "M") continue;
+                        let mineCount = 0;
+                        directions.forEach(dr => {
+                            directions.forEach(dc => {
+                                if (dr === 0 && dc === 0) return;
+                                const newRow = r + dr;
+                                const newCol = c + dc;
+                                if (newRow >= 0 && newRow < this.rows && newCol >= 0 && newCol < this.cols && this.board[newRow][newCol] === "M") {
+                                    mineCount++;
+                                }
+                            });
+                        });
+                        this.board[r][c] = mineCount > 0 ? mineCount.toString() : "";
+                    }
+                }
+            }
+
+            revealCell(row, col) {
+                if (row < 0 || row >= this.rows || col < 0 || col >= this.cols || this.revealed[row][col]) {
+                    return;
+                }
+                this.revealed[row][col] = true;
+                const cellElement = document.getElementById(`cell-${row}-${col}`);
+                if (this.board[row][col] === "M") {
+                    cellElement.textContent = "💣";
+                    cellElement.classList.add("mine");
+                    setTimeout(() => this.init(), 1000); // Restart game after 1 sec
+                } else {
+                    cellElement.textContent = this.board[row][col];
+                    cellElement.classList.add("revealed");
+                    if (this.board[row][col] === "") {
+                        const directions = [-1, 0, 1];
+                        directions.forEach(dr => {
+                            directions.forEach(dc => {
+                                if (dr === 0 && dc === 0) return;
+                                this.revealCell(row + dr, col + dc);
+                            });
+                        });
+                    }
+                }
+                this.checkWin();
+            }
+
+            checkWin() {
+                let allRevealed = true;
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (this.board[r][c] !== "M" && !this.revealed[r][c]) {
+                            allRevealed = false;
+                            break;
+                        }
+                    }
+                    if (!allRevealed) break;
+                }
+                if (allRevealed) {
+                    setTimeout(() => {
+                        alert("You Win!");
+                        this.init();
+                    }, 500);
+                }
+            }
+
+            renderBoard() {
+                const boardElement = document.getElementById("board");
+                boardElement.innerHTML = "";
+                boardElement.style.gridTemplateColumns = `repeat(${this.cols}, 30px)`;
+                boardElement.style.gridTemplateRows = `repeat(${this.rows}, 30px)`;
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        const cell = document.createElement("div");
+                        cell.id = `cell-${r}-${c}`;
+                        cell.classList.add("cell");
+                        cell.addEventListener("click", () => this.revealCell(r, c));
+                        boardElement.appendChild(cell);
+                    }
+                }
+            }
+        }
+
+        const game = new Minesweeper(5, 5, 5);
+        document.getElementById("restart").addEventListener("click", () => game.init());
+    </script>
+</body>
+</html>
+
+
