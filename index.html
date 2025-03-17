@@ -8,6 +8,9 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
         }
         .board {
             display: grid;
@@ -34,30 +37,93 @@
             background-color: red;
             color: white;
         }
+        .flag {
+            background-color: #ffcc00;
+        }
+        .controls {
+            margin: 20px auto;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .message {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 20px 0;
+            height: 30px;
+        }
     </style>
 </head>
 <body>
     <h1>Minesweeper</h1>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="rows">Rows:</label>
+            <input type="number" id="rows" min="3" max="20" value="5">
+        </div>
+
+        <div class="control-group">
+            <label for="cols">Columns:</label>
+            <input type="number" id="cols" min="3" max="20" value="5">
+        </div>
+
+        <div class="control-group">
+            <label for="mines">Mines:</label>
+            <input type="number" id="mines" min="1" value="5">
+        </div>
+
+        <button id="apply">Apply Settings</button>
+        <button id="restart">Restart Game</button>
+    </div>
+
+    <div id="message" class="message"></div>
     <div id="board" class="board"></div>
-    <button id="restart">Restart Game</button>
 
     <script>
         class Minesweeper {
             constructor(rows, cols, mines) {
                 this.rows = rows;
                 this.cols = cols;
-                this.mines = mines;
+                this.mines = Math.min(mines, rows * cols - 1); // Ensure mines don't exceed available cells
                 this.board = [];
                 this.revealed = [];
+                this.gameOver = false;
+                this.messageElement = document.getElementById("message");
                 this.init();
             }
 
             init() {
+                this.gameOver = false;
                 this.board = Array.from({ length: this.rows }, () => Array(this.cols).fill(""));
                 this.revealed = Array.from({ length: this.rows }, () => Array(this.cols).fill(false));
+                this.flags = Array.from({ length: this.rows }, () => Array(this.cols).fill(false));
                 this.placeMines();
                 this.calculateNumbers();
                 this.renderBoard();
+                this.messageElement.textContent = "";
             }
 
             placeMines() {
@@ -94,18 +160,25 @@
             }
 
             revealCell(row, col) {
-                if (row < 0 || row >= this.rows || col < 0 || col >= this.cols || this.revealed[row][col]) {
+                if (this.gameOver || row < 0 || row >= this.rows || col < 0 || col >= this.cols || this.revealed[row][col] || this.flags[row][col]) {
                     return;
                 }
+
                 this.revealed[row][col] = true;
                 const cellElement = document.getElementById(`cell-${row}-${col}`);
+
                 if (this.board[row][col] === "M") {
                     cellElement.textContent = "💣";
                     cellElement.classList.add("mine");
-                    setTimeout(() => this.init(), 1000); // Restart game after 1 sec
+                    this.gameOver = true;
+                    this.revealAllMines();
+                    this.messageElement.textContent = "Game Over!";
+                    this.messageElement.style.color = "red";
                 } else {
                     cellElement.textContent = this.board[row][col];
                     cellElement.classList.add("revealed");
+
+                    // If empty cell, reveal surrounding cells
                     if (this.board[row][col] === "") {
                         const directions = [-1, 0, 1];
                         directions.forEach(dr => {
@@ -116,10 +189,45 @@
                         });
                     }
                 }
+
                 this.checkWin();
             }
 
+            flagCell(event, row, col) {
+                event.preventDefault(); // Prevent context menu
+
+                if (this.gameOver || this.revealed[row][col]) {
+                    return;
+                }
+
+                const cellElement = document.getElementById(`cell-${row}-${col}`);
+                this.flags[row][col] = !this.flags[row][col];
+
+                if (this.flags[row][col]) {
+                    cellElement.textContent = "🚩";
+                    cellElement.classList.add("flag");
+                } else {
+                    cellElement.textContent = "";
+                    cellElement.classList.remove("flag");
+                }
+
+                this.checkWin();
+            }
+
+            revealAllMines() {
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (this.board[r][c] === "M" && !this.revealed[r][c]) {
+                            const cell = document.getElementById(`cell-${r}-${c}`);
+                            cell.textContent = "💣";
+                        }
+                    }
+                }
+            }
+
             checkWin() {
+                if (this.gameOver) return;
+
                 let allRevealed = true;
                 for (let r = 0; r < this.rows; r++) {
                     for (let c = 0; c < this.cols; c++) {
@@ -130,11 +238,22 @@
                     }
                     if (!allRevealed) break;
                 }
+
                 if (allRevealed) {
-                    setTimeout(() => {
-                        alert("You Win!");
-                        this.init();
-                    }, 500);
+                    this.gameOver = true;
+                    // Mark all mines with flags
+                    for (let r = 0; r < this.rows; r++) {
+                        for (let c = 0; c < this.cols; c++) {
+                            if (this.board[r][c] === "M" && !this.flags[r][c]) {
+                                const cell = document.getElementById(`cell-${r}-${c}`);
+                                cell.textContent = "🚩";
+                                cell.classList.add("flag");
+                            }
+                        }
+                    }
+
+                    this.messageElement.textContent = "You Win!";
+                    this.messageElement.style.color = "#4CAF50";
                 }
             }
 
@@ -143,22 +262,46 @@
                 boardElement.innerHTML = "";
                 boardElement.style.gridTemplateColumns = `repeat(${this.cols}, 30px)`;
                 boardElement.style.gridTemplateRows = `repeat(${this.rows}, 30px)`;
+
                 for (let r = 0; r < this.rows; r++) {
                     for (let c = 0; c < this.cols; c++) {
                         const cell = document.createElement("div");
                         cell.id = `cell-${r}-${c}`;
                         cell.classList.add("cell");
                         cell.addEventListener("click", () => this.revealCell(r, c));
+                        cell.addEventListener("contextmenu", (e) => this.flagCell(e, r, c));
                         boardElement.appendChild(cell);
                     }
                 }
             }
         }
 
-        const game = new Minesweeper(5, 5, 5);
+        // Initialize game with default settings
+        let game = new Minesweeper(5, 5, 5);
+
+        // Event listeners for controls
+        document.getElementById("apply").addEventListener("click", applySettings);
         document.getElementById("restart").addEventListener("click", () => game.init());
+
+        function applySettings() {
+            const rows = parseInt(document.getElementById("rows").value);
+            const cols = parseInt(document.getElementById("cols").value);
+            let mines = parseInt(document.getElementById("mines").value);
+
+            // Validate input
+            const validRows = Math.min(Math.max(rows, 3), 20);
+            const validCols = Math.min(Math.max(cols, 3), 20);
+            const maxMines = validRows * validCols - 1;
+            const validMines = Math.min(Math.max(mines, 1), maxMines);
+
+            // Update input fields if values were adjusted
+            document.getElementById("rows").value = validRows;
+            document.getElementById("cols").value = validCols;
+            document.getElementById("mines").value = validMines;
+
+            // Create new game with validated settings
+            game = new Minesweeper(validRows, validCols, validMines);
+        }
     </script>
 </body>
 </html>
-
-
